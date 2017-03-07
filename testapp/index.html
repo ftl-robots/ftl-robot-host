@@ -1,0 +1,230 @@
+<html>
+<head>
+    <title>Test App</title>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <h1>Hello</h1>
+
+    <p>Set up: DIO0, DIO1, DIO2 are set up as inputs, DIO3, DIO4, DIO5 are outputs</p>
+
+    <h2>Raspi Host View</h2>
+    <table>
+        <tr>
+            <th>Digital Inputs (From A-Star)</th>
+            <td>DIO0: <span id="dio-0-input">OFF</span></td>
+            <td>DIO1: <span id="dio-1-input">OFF</span></td>
+            <td>DIO2: <span id="dio-2-input">OFF</span></td>
+        </tr>
+        <tr>
+            <th>Digital Outputs (To A-Star)</th>
+            <td>DIO3: <input type="checkbox" id="dio-3-output"></td>
+            <td>DIO4: <input type="checkbox" id="dio-4-output"></td>
+            <td>DIO5: <input type="checkbox" id="dio-5-output"></td>
+        </tr>
+        <tr>
+            <th>Analog Inputs (From A-Star)</th>
+            <td>AIN0: <span id="ain-0">0.0</span></td>
+            <td>AIN1: <span id="ain-1">0.0</span></td>
+            <td>AIN2: <span id="ain-2">0.0</span></td>
+        </tr>
+        <tr>
+            <th></th>
+            <td>AIN3: <span id="ain-3">0.0</span></td>
+            <td>AIN4: <span id="ain-4">0.0</span></td>
+            <td></td>
+        </tr>
+        <tr>
+            <th>Battery Voltage</th>
+            <td>Voltage: <span id="batt-voltage">0.0</span></td>
+            
+        </tr>
+    </table>
+
+    <h2>A-Star View</h2>
+    <table>
+        <tr>
+            <th>Digital Outputs (From Host)</th>
+            <td>DIO3: <span id="astar-dio-3-output">OFF</span></td>
+            <td>DIO4: <span id="astar-dio-4-output">OFF</span></td>
+            <td>DIO5: <span id="astar-dio-5-output">OFF</span></td>
+        </tr>
+        <tr>
+            <th>Digital Inputs (To Host)</th>
+            <td>DIO0: <input type="checkbox" id="astar-dio-0-input"></td>
+            <td>DIO1: <input type="checkbox" id="astar-dio-1-input"></td>
+            <td>DIO2: <input type="checkbox" id="astar-dio-2-input"></td>
+        </tr>
+        <tr>
+            <th>Analog Inputs (From A-Star)</th>
+            <td>AIN0: <input type="number" id="astar-ain0-value" min="0" max="1023"></td>
+            <td>AIN1: <input type="number" id="astar-ain1-value" min="0" max="1023"></td>
+            <td>AIN2: <input type="number" id="astar-ain2-value" min="0" max="1023"></td>
+        </tr>
+        <tr>
+            <th></th>
+            <td>AIN3: <input type="number" id="astar-ain3-value" min="0" max="1023"></td>
+            <td>AIN4: <input type="number" id="astar-ain4-value" min="0" max="1023"></td>
+            <td></td>
+        </tr>
+        <tr>
+            <th>Battery Voltage</th>
+            <td>Voltage: <input type="number" id="astar-batt-value" min="0" max="12000"></td>
+            
+        </tr>
+    </table>
+</body>
+<script>
+window.addEventListener('load', function () {
+
+var socket = io();
+
+// Host Components
+var hostDio0Input = document.getElementById('dio-0-input');
+var hostDio1Input = document.getElementById('dio-1-input');
+var hostDio2Input = document.getElementById('dio-2-input');
+
+var hostDio3Output = document.getElementById('dio-3-output');
+hostDio3Output.addEventListener('change', setOutputs);
+var hostDio4Output = document.getElementById('dio-4-output');
+hostDio4Output.addEventListener('change', setOutputs);
+var hostDio5Output = document.getElementById('dio-5-output');
+hostDio5Output.addEventListener('change', setOutputs);
+
+var hostAin0 = document.getElementById('ain-0');
+var hostAin1 = document.getElementById('ain-1');
+var hostAin2 = document.getElementById('ain-2');
+var hostAin3 = document.getElementById('ain-3');
+var hostAin4 = document.getElementById('ain-4');
+
+var hostBattVoltage = document.getElementById('batt-voltage');
+
+var astarDio3Output = document.getElementById('astar-dio-3-output');
+var astarDio4Output = document.getElementById('astar-dio-4-output');
+var astarDio5Output = document.getElementById('astar-dio-5-output');
+
+var astarDio0Input = document.getElementById('astar-dio-0-input');
+var astarDio1Input = document.getElementById('astar-dio-1-input');
+var astarDio2Input = document.getElementById('astar-dio-2-input');
+
+var astarAin0 = document.getElementById('astar-ain0-value');
+var astarAin1 = document.getElementById('astar-ain1-value');
+var astarAin2 = document.getElementById('astar-ain2-value');
+var astarAin3 = document.getElementById('astar-ain3-value');
+var astarAin4 = document.getElementById('astar-ain4-value');
+
+var astarBatt = document.getElementById('astar-batt-value');
+
+astarAin0.addEventListener('change', setAstarOutputs);
+astarAin1.addEventListener('change', setAstarOutputs);
+astarAin2.addEventListener('change', setAstarOutputs);
+astarAin3.addEventListener('change', setAstarOutputs);
+astarAin4.addEventListener('change', setAstarOutputs);
+astarBatt.addEventListener('change', setAstarOutputs);
+
+astarDio0Input.addEventListener('change', setAstarOutputs);
+astarDio1Input.addEventListener('change', setAstarOutputs);
+astarDio2Input.addEventListener('change', setAstarOutputs);
+
+var arduinoBuf = [];
+for (var i = 0; i < 23; i++) {
+    arduinoBuf[i] = 0;
+}
+
+function setOutputs() {
+    // send a json object representing DIO state
+    var outputs = {
+        dio3: hostDio3Output.checked,
+        dio4: hostDio4Output.checked,
+        dio5: hostDio5Output.checked
+    }
+
+    socket.emit('hostOutput', outputs);
+}
+
+function setAstarOutputs() {
+    var buf = arduinoBuf.slice(0);
+    buf[0] = buf[1] = buf[2] = buf[3] = 0;
+    
+    // byte 4 is din 
+    var dinVals = (astarDio0Input.checked ? 1 : 0) | 
+                  (astarDio1Input.checked ? 2 : 0) |
+                  (astarDio2Input.checked ? 4 : 0);
+    buf[4] = dinVals;
+
+    var ains = [
+        astarAin0,
+        astarAin1,
+        astarAin2,
+        astarAin3,
+        astarAin4
+    ];
+
+    var ainBufOffset = 5;
+    for (var i = 0; i < 5; i++) {
+        var aVal = parseInt(ains[i].value, 10);
+        if (isNaN(aVal)) {
+            aVal = 0;
+        }
+        if (aVal < 0) aVal = 0;
+        if (aVal > 1023) aVal = 1023;
+        ains[i].value = aVal;
+
+        ainBufOffset = 5 + (i * 2);
+        buf[ainBufOffset] = (aVal >> 8) & 0xFF;
+        buf[ainBufOffset + 1] = aVal & 0xFF;
+    }
+    
+    var battVal = parseInt(astarBatt.value, 10);
+    if (isNaN(battVal)) battVal = 0;
+    if (battVal < 0) battVal = 0;
+    if (battVal > 12000) battVal = 12000;
+    astarBatt.value = battVal;
+
+    buf[15] = (battVal >> 8) & 0xFF;
+    buf[16] = battVal & 0xFF;
+
+    socket.emit('arduinoBuffer', buf);
+}
+
+socket.on('incomingBuffer', function (buf) {
+    // This represents a raw 'i2c' buffer incoming from the host
+    // because this file represents the arduino.
+
+    // we really only care about the 'output' side of the buffer 
+    if (buf.length !== 23) {
+        console.error('Incorrectly sized buffer: ' + buf.length);
+        return;
+    }
+
+    var doutByte = buf[18];
+    var doutVals = [false, false, false, false, false, false];
+    for (var i = 0; i < 6; i++) {
+        doutVals[i] = ((doutByte >> i) & 0x1) === 1;
+    }
+
+    // Update
+    astarDio3Output.innerHTML = doutVals[3] ? 'ON' : 'OFF';
+    astarDio4Output.innerHTML = doutVals[4] ? 'ON' : 'OFF';
+    astarDio5Output.innerHTML = doutVals[5] ? 'ON' : 'OFF';
+
+    arduinoBuf = buf;
+});
+
+socket.on('hostInput', function (data) {
+    hostDio0Input.innerHTML = data.dinVals[0] ? 'ON' : 'OFF';
+    hostDio1Input.innerHTML = data.dinVals[1] ? 'ON' : 'OFF';
+    hostDio2Input.innerHTML = data.dinVals[2] ? 'ON' : 'OFF';
+
+    hostAin0.innerHTML = data.ainVals[0];
+    hostAin1.innerHTML = data.ainVals[1];
+    hostAin2.innerHTML = data.ainVals[2];
+    hostAin3.innerHTML = data.ainVals[3];
+    hostAin4.innerHTML = data.ainVals[4];
+
+    hostBattVoltage.innerHTML = data.battMV;
+});
+
+});
+</script>
+</html>
