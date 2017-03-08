@@ -67,9 +67,18 @@ class PololuAstarBoard extends RobotDevice {
             ]
         };
 
+        this.d_lastReceivedBuffer;
+        this.d_masterBuffer = Buffer.alloc(23);
+        this.d_writeBuffer;
+        this.d_flushTimer;
+        this.d_inWrite = false; // Set to true when we are writing
+        this.d_inFlush = false; // Set to true when flushing onto the bus
+
+
         this.d_lastBuf;
         this.d_tempBuffer;
         this.d_inWriteBuffer;
+        this.d_activeWriteBuffer; // Just a reference to which buffer to write to
         this.d_writeTimer;
         this.d_inWrite = false;
 
@@ -82,8 +91,20 @@ class PololuAstarBoard extends RobotDevice {
         // Make an i2c call to the board to get status 
         // Read 23 bytes from the board
         var buf = this.d_i2c.readSync(this.d_addr, 0x0, 23);
-        this.d_lastBuf = buf;
-        this.d_outBuf = Buffer.from(this.d_lastBuf);
+        this.d_lastReceivedBuffer = buf;
+
+        // Check if we are in write mode
+        if (this.d_inWrite) {
+            // Just copy bytes 0 to 16 into master
+            // these deal with the inputs
+            for (var i = 0; i < 17; i++) {
+                this.d_masterBuffer[i] = this.d_lastReceivedBuffer[i];
+            }
+        }
+        else {
+            // Not in write, just copy to the master buffer 
+            this.d_masterBuffer = Buffer.from(this.d_lastReceivedBuffer);
+        }
 
         // The parts we really care about are bytes 3 to 16
         var buttonVals = buf[3];
@@ -112,81 +133,77 @@ class PololuAstarBoard extends RobotDevice {
     // if we don't have a tempBuffer, create one
     // set a timeout for 10-25ms before we send it 
     _setupWrite() {
-        if (this.d_inWrite && !this.d_inWriteBuffer) {
-            this.d_inWriteBuffer = Buffer.from(this.d_tempBuffer);
+        if (this.d_inFlush && !this.d_writeBuffer) {
+            // If we are in flush mode, create the write buffer if we need to
+            this.d_writeBuffer = Buffer.from(this.d_masterBuffer);
         }
 
-        if (!this.d_tempBuffer) {
-            // Create a temp buffer from the last buffer that we got
-            this.d_tempBuffer = Buffer.from(this.d_lastBuf);
+        if (this.d_inFlush) {
+            this.d_activeWriteBuffer = this.d_writeBuffer;
+        }
+        else {
+            this.d_activeWriteBuffer = this.d_masterBuffer;
+        }
+        
+        // If we're not in write mode yet, set it up
+        // We just need to set the flag, since receive buffer does everything else
+        if (!this.d_inWrite) {
+            this.d_inWrite = true;
         }
 
-        if (!this.d_writeTimer) {
-            this.d_writeTimer = setTimeout(this._flushWriteBuffer.bind(this), 25);
+        if (!this.d_flushTimer) {
+            this.d_flushTimer = setTimeout(this._flushWriteBuffer.bind(this), 25);
         }
     }
 
     _flushWriteBuffer() {
-        // we will set the d_lastBuf to whatever we have now
-        this.d_inWrite = true;
-        this.d_i2c.writeSync(this.d_addr, 0, this.d_tempBuffer);
+        this.d_inFlush = true;
+        // Copy the master buffer 
+        var outBuf = Buffer.from(this.d_masterBuffer);
+        this.d_i2c.writeSync(this.d_addr, 0, outBuf);
+        this.d_inFlush = false;
         this.d_inWrite = false;
-        this.d_lastBuf = Buffer.from(this.d_tempBuffer);
-        this.d_writeTimer = undefined;
-        this.d_tempBuffer = undefined;
+        this.d_flushTimer = undefined;
 
-        if (this.d_inWriteBuffer) {
-            this.d_lastBuf = Buffer.from(this.d_inWriteBuffer);
-            this.d_tempBuffer = Buffer.from(this.d_inWriteBuffer);
-            this.d_writeTimer = setTimeout(this._flushWriteBuffer.bind(this), 25);
+        if (this.d_writeBuffer) {
+            // If the write buffer exists, copy the OUT bits to master buffer 
+            // copy the config bits
+            this.d_masterBuffer[0] = this.d_writeBuffer[0];
+            this.d_masterBuffer[1] = this.d_writeBuffer[1];
+            this.d_masterBuffer[2] = this.d_writeBuffer[2];
+
+            for (var i = 17; i < 23; i++) {
+                this.d_masterBuffer[i] = this.d_writeBuffer[i];
+            }
+
+            // Clear out the flush buffer
+            this.d_writeBuffer = undefined;
+
+            // set up the write mode again
+            this.d_inWrite = true;
+            this.d_flushTimer = setTimeout(this._flushWriteBuffer.bind(this), 25);
         }
     }
 
     _writeByte(register, byte) {
         this._setupWrite();
 
-        var bufferToWrite;
-        if (this.d_inWrite) {
-            bufferToWrite = this.d_inWriteBuffer;
-        }
-        else {
-            bufferToWrite = this.d_tempBuffer;
-        }
-        bufferToWrite[register] = byte;
-        this.d_lastBuf = Buffer.from(bufferToWrite);
+        this.d_activeWriteBuffer[register] = byte;
     }
 
     _writeWord(register, word) {
         this._setupWrite();
 
-        var bufferToWrite;
-        if (this.d_inWrite) {
-            bufferToWrite = this.d_inWriteBuffer;
-        }
-        else {
-            bufferToWrite = this.d_tempBuffer;
-        }
-
-        bufferToWrite[register] = (word >> 8) & 0xFF;
-        bufferToWrite[register + 1] = word & 0xFF;
-        this.d_lastBuf = Buffer.from(bufferToWrite);
+        this.d_activeWriteBuffer[register] = (word >> 8) & 0xFF;
+        this.d_activeWriteBuffer[register + 1] = word & 0xFF;
     }
 
     _writeBuffer(register, buffer) {
         this._setupWrite();
 
-        var bufferToWrite;
-        if (this.d_inWrite) {
-            bufferToWrite = this.d_inWriteBuffer;
-        }
-        else {
-            bufferToWrite = this.d_tempBuffer;
-        }
-
         for (var i = 0; i < buffer.length; i++) {
-            bufferToWrite[register + i] = buffer[i];
+            this.d_activeWriteBuffer[register + i] = buffer[i];
         }
-        this.d_lastBuf = Buffer.from(bufferToWrite);
     }
 
     // === External Interface
@@ -195,7 +212,7 @@ class PololuAstarBoard extends RobotDevice {
         // 2/3 -> byte 1
         // 4/5 -> byte 2
         var configByteIdx = Math.floor(channel / 2);
-        var configByte = this.d_lastBuf[configByteIdx];
+        var configByte = this.d_masterBuffer[configByteIdx];
         
         var newSetting = 0x4;
         switch(mode) {
@@ -218,14 +235,38 @@ class PololuAstarBoard extends RobotDevice {
             outByte = (configByte & 0xF0) | (newSetting & 0xF);
         }
 
-        // this.writeByte(configByteIdx, outByte);
-        // Write directly first, till we figure out how to buffer properly
-        //this.d_i2c.writeByteSync(this.d_addr, configByteIdx, outByte);
         this._writeByte(configByteIdx, outByte);
     }
 
-    writeDigital(channel, value) {
-        var oldByte = this.d_lastBuf[18];
+    write(portType, channel, value) {
+        if (portType === Constants.PortTypes.DIGITAL) {
+            this._writeDigital(channel, value);
+        }
+        else if (portType === Constants.PortTypes.PWM) {
+            this._writePWM(channel, value);
+        }
+        else {
+            console.warn("Attempting to write to unsupported port type");
+        }
+    }
+
+    read(portType, channel) {
+        if (portType === Constants.PortTypes.DIGITAL) {
+            return this._readDigital(channel);
+        }
+        else if (portType === Constants.PortTypes.ANALOG) {
+            return this._readAnalog(channel);
+        }
+        else if (portType === 'ASTAR-BUTTON') {
+            return this._readButton(channel);
+        }
+        else if (portType === 'ASTAR-BATT') {
+            return this.d_boardState.battMV;
+        }
+    }
+
+    _writeDigital(channel, value) {
+        var oldByte = this.d_masterBuffer[18];
         var newByte;
         if (value) {
             newByte = oldByte | (1 << channel);
@@ -234,14 +275,10 @@ class PololuAstarBoard extends RobotDevice {
             newByte = oldByte & ~(1 << channel);
         }
 
-        // Definitely need buffering
-        //this.d_lastBuf[18] = newByte; 
-
-        //this.d_i2c.writeByteSync(this.d_addr, 18, newByte);
         this._writeByte(18, newByte);
     }
 
-    writePWM(channel, value) {
+    _writePWM(channel, value) {
         // ch 0 is left motor, ch 1 is right motor
         // send -400 to 400
         // take in -1 to 1
@@ -267,23 +304,32 @@ class PololuAstarBoard extends RobotDevice {
         }
 
         output = Math.round(output);
-        var chOffset = 19 + (channel * 2);
 
-        //this.d_i2c.writeWordSync(this.d_addr, chOffset, (output & 0xFFFF));
+        //flip to follow WPILib format
+        output = -output;
+        var chOffset = 19 + (channel * 2);
 
         this._writeWord(chOffset, (output & 0xFFFF));
     }
 
-    readDigital(channel) {
+    _readDigital(channel) {
         return this.d_boardState.digitalIn[channel];
     }
 
-    readAnalog(channel) {
+    _readAnalog(channel) {
         return this.d_boardState.analogIn[channel];
     }
 
-    readBattMV() {
-        return this.d_boardState.battMV;
+    _readButton(channel) {
+        if (channel === 'A') {
+            return this.d_boardState.buttons.buttonA;
+        }
+        else if (channel === 'B') {
+            return this.d_boardState.buttons.buttonB;
+        }
+        else if (channel === 'C') {
+            return this.d_boardState.buttons.buttonC;
+        }
     }
 };
 

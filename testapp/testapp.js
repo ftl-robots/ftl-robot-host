@@ -5,6 +5,7 @@ var io = require('socket.io')(http);
 
 const Robot = require('../index');
 const FakeI2C = require('../fakei2c');
+const Constants = require('../constants');
 
 var robot = new Robot({
     devices: [
@@ -16,52 +17,90 @@ var robot = new Robot({
     portMap: {
         'D-0': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.DIGITAL,
             devicePort: 0
         },
         'D-1': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.DIGITAL,
             devicePort: 1
         },
         'D-2': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.DIGITAL,
             devicePort: 2
         },
         'D-3': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.DIGITAL,
             devicePort: 3
         },
         'D-4': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.DIGITAL,
             devicePort: 4
         },
         'D-5': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.DIGITAL,
             devicePort: 5
+        },
+        // Virtual digital ports for buttons
+        'D-6': {
+            deviceId: 'main-board',
+            devicePortType: 'ASTAR-BUTTON',
+            devicePort: 'A'
+        },
+        'D-7': {
+            deviceId: 'main-board',
+            devicePortType: 'ASTAR-BUTTON',
+            devicePort: 'B'
+        },
+        'D-8': {
+            deviceId: 'main-board',
+            devicePortType: 'ASTAR-BUTTON',
+            devicePort: 'C'
         },
         'A-0': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.ANALOG,
             devicePort: 0
         },
         'A-1': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.ANALOG,
             devicePort: 1
         },
         'A-2': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.ANALOG,
             devicePort: 2
         },
         'A-3': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.ANALOG,
             devicePort: 3
         },
         'A-4': {
             deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.ANALOG,
             devicePort: 4
         },
         'batt': {
             deviceId: 'main-board',
+            devicePortType: 'ASTAR-BATT',
             devicePort: 'batt'
-        }
+        },
+        'PWM-0': {
+            deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.PWM,
+            devicePort: 0
+        },
+        'PWM-1': {
+            deviceId: 'main-board',
+            devicePortType: Constants.PortTypes.PWM,
+            devicePort: 1
+        },
     }
 });
 
@@ -95,7 +134,10 @@ setInterval(function() {
             robot.readAnalog(3),
             robot.readAnalog(4),
         ],
-        battMV: robot.readBattMV()
+        battMV: robot.readBattMV(),
+        buttonA: robot.readDigital(6),
+        buttonB: robot.readDigital(7),
+        buttonC: robot.readDigital(8)
     };
 
     io.sockets.emit('hostInput', hostThings);
@@ -108,6 +150,8 @@ io.on('connection', function (socket) {
         robot.writeDigital(4, data.dio4);
         robot.writeDigital(5, data.dio5);
 
+        robot.writePWM(0, data.pwm0);
+        robot.writePWM(1, data.pwm1);
     });
 
     socket.on('arduinoBuffer', function(buf) {

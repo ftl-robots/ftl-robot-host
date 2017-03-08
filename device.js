@@ -12,20 +12,12 @@ class RobotDevice {
 
     }
 
-    writeDigital(channel, value) {
+    write(portType, channel, value) {
 
     }
 
-    writePWM(channel, value) {
+    read(portType, channel, value) {
 
-    }
-
-    readDigital(channel) {
-
-    }
-
-    readAnalog(channel) {
-        
     }
 };
 

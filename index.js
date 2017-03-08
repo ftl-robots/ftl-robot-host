@@ -44,6 +44,7 @@ class Robot extends EventEmitter {
 
             this.d_portDeviceMaps[portName] = {
                 device: this.d_devices[mapInfo.deviceId],
+                devicePortType: mapInfo.devicePortType,
                 devicePort: mapInfo.devicePort
             }
         }
@@ -72,7 +73,7 @@ class Robot extends EventEmitter {
         var deviceMapInfo = this.d_portDeviceMaps[channelName];
         if (deviceMapInfo) {
             var device = deviceMapInfo.device;
-            device.writeDigital(deviceMapInfo.devicePort, value);
+            device.write(deviceMapInfo.devicePortType, deviceMapInfo.devicePort, value);
         }
         else {
             throw new Error('Attempting to write to unmapped port ' + channelName);
@@ -85,7 +86,7 @@ class Robot extends EventEmitter {
         var deviceMapInfo = this.d_portDeviceMaps[channelName];
         if (deviceMapInfo) {
             var device = deviceMapInfo.device;
-            device.writePWM(deviceMapInfo.devicePort, value);
+            device.write(deviceMapInfo.devicePortType, deviceMapInfo.devicePort, value);
         }
         else {
             throw new Error('Attempting to write to unmapped port ' + channelName);
@@ -98,7 +99,8 @@ class Robot extends EventEmitter {
         var deviceMapInfo = this.d_portDeviceMaps[channelName];
         if (deviceMapInfo) {
             var device = deviceMapInfo.device;
-            return device.readDigital(deviceMapInfo.devicePort);
+            //return device.readDigital(deviceMapInfo.devicePort);
+            return device.read(deviceMapInfo.devicePortType, deviceMapInfo.devicePort);
         }
         else {
             throw new Error('Attempting to read from unmapped port ' + channelName);
@@ -111,7 +113,7 @@ class Robot extends EventEmitter {
         var deviceMapInfo = this.d_portDeviceMaps[channelName];
         if (deviceMapInfo) {
             var device = deviceMapInfo.device;
-            return device.readAnalog(deviceMapInfo.devicePort);
+            return device.read(deviceMapInfo.devicePortType, deviceMapInfo.devicePort);
         }
         else {
             throw new Error('Attempting to read from unmapped port ' + channelName);
@@ -124,7 +126,7 @@ class Robot extends EventEmitter {
         var deviceMapInfo = this.d_portDeviceMaps[channelName];
         if (deviceMapInfo) {
             var device = deviceMapInfo.device;
-            return device.readBattMV();
+            return device.read(deviceMapInfo.devicePortType, deviceMapInfo.devicePort);
         }
         else {
             throw new Error('Attempting to read from unmapped port ' + channelName);

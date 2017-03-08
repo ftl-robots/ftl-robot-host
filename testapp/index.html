@@ -23,6 +23,17 @@
             <td>DIO5: <input type="checkbox" id="dio-5-output"></td>
         </tr>
         <tr>
+            <th>Button Status (From A-Star)</th>
+            <td>Button A: <span id="button-a">OFF</span></td>
+            <td>Button B: <span id="button-b">OFF</span></td>
+            <td>Button C: <span id="button-c">OFF</span></td>
+        </tr>
+        <tr>
+            <th>PWM Outputs (To A-Star)</th>
+            <td>PWM0: <input type="range" id="pwm-0-output" min="-1" max="1" step="0.05" value="0"><span id="pwm-0-value">0.00</span></td>
+            <td>PWM1: <input type="range" id="pwm-1-output" min="-1" max="1" step="0.05" value="0"><span id="pwm-1-value">0.00</span></td>
+        </tr>
+        <tr>
             <th>Analog Inputs (From A-Star)</th>
             <td>AIN0: <span id="ain-0">0.0</span></td>
             <td>AIN1: <span id="ain-1">0.0</span></td>
@@ -50,10 +61,21 @@
             <td>DIO5: <span id="astar-dio-5-output">OFF</span></td>
         </tr>
         <tr>
+            <th>PWM Outputs (From Host)</th>
+            <td>PWM0: <span id="astar-pwm-0-output">0</span></td>
+            <td>PWM1: <span id="astar-pwm-1-output">0</span></td>
+        </tr>
+        <tr>
             <th>Digital Inputs (To Host)</th>
             <td>DIO0: <input type="checkbox" id="astar-dio-0-input"></td>
             <td>DIO1: <input type="checkbox" id="astar-dio-1-input"></td>
             <td>DIO2: <input type="checkbox" id="astar-dio-2-input"></td>
+        </tr>
+        <tr>
+            <th>A-Star Buttons (To Host)</th>
+            <td>Button A: <input type="checkbox" id="astar-button-a"></td>
+            <td>Button B: <input type="checkbox" id="astar-button-b"></td>
+            <td>Button C: <input type="checkbox" id="astar-button-c"></td>
         </tr>
         <tr>
             <th>Analog Inputs (From A-Star)</th>
@@ -91,6 +113,14 @@ hostDio4Output.addEventListener('change', setOutputs);
 var hostDio5Output = document.getElementById('dio-5-output');
 hostDio5Output.addEventListener('change', setOutputs);
 
+var hostPwm0Output = document.getElementById('pwm-0-output');
+var hostPwm1Output = document.getElementById('pwm-1-output');
+var hostPwm0Value = document.getElementById('pwm-0-value');
+var hostPwm1Value = document.getElementById('pwm-1-value');
+
+hostPwm0Output.addEventListener('change', setOutputs);
+hostPwm1Output.addEventListener('change', setOutputs);
+
 var hostAin0 = document.getElementById('ain-0');
 var hostAin1 = document.getElementById('ain-1');
 var hostAin2 = document.getElementById('ain-2');
@@ -99,9 +129,16 @@ var hostAin4 = document.getElementById('ain-4');
 
 var hostBattVoltage = document.getElementById('batt-voltage');
 
+var hostButtonA = document.getElementById('button-a');
+var hostButtonB = document.getElementById('button-b');
+var hostButtonC = document.getElementById('button-c');
+
 var astarDio3Output = document.getElementById('astar-dio-3-output');
 var astarDio4Output = document.getElementById('astar-dio-4-output');
 var astarDio5Output = document.getElementById('astar-dio-5-output');
+
+var astarPwm0Output = document.getElementById('astar-pwm-0-output');
+var astarPwm1Output = document.getElementById('astar-pwm-1-output');
 
 var astarDio0Input = document.getElementById('astar-dio-0-input');
 var astarDio1Input = document.getElementById('astar-dio-1-input');
@@ -114,6 +151,14 @@ var astarAin3 = document.getElementById('astar-ain3-value');
 var astarAin4 = document.getElementById('astar-ain4-value');
 
 var astarBatt = document.getElementById('astar-batt-value');
+
+var astarButtonA = document.getElementById('astar-button-a');
+var astarButtonB = document.getElementById('astar-button-b');
+var astarButtonC = document.getElementById('astar-button-c');
+
+astarButtonA.addEventListener('change', setAstarOutputs);
+astarButtonB.addEventListener('change', setAstarOutputs);
+astarButtonC.addEventListener('change', setAstarOutputs);
 
 astarAin0.addEventListener('change', setAstarOutputs);
 astarAin1.addEventListener('change', setAstarOutputs);
@@ -132,11 +177,15 @@ for (var i = 0; i < 23; i++) {
 }
 
 function setOutputs() {
+    hostPwm0Value.innerHTML = hostPwm0Output.value;
+    hostPwm1Value.innerHTML = hostPwm1Output.value;
     // send a json object representing DIO state
     var outputs = {
         dio3: hostDio3Output.checked,
         dio4: hostDio4Output.checked,
-        dio5: hostDio5Output.checked
+        dio5: hostDio5Output.checked,
+        pwm0: hostPwm0Output.value,
+        pwm1: hostPwm1Output.value
     }
 
     socket.emit('hostOutput', outputs);
@@ -144,8 +193,13 @@ function setOutputs() {
 
 function setAstarOutputs() {
     var buf = arduinoBuf.slice(0);
-    buf[0] = buf[1] = buf[2] = buf[3] = 0;
+    buf[0] = buf[1] = buf[2] = 0;
     
+    var buttonVals = (astarButtonA.checked ? 1 : 0) |
+                     (astarButtonB.checked ? 2 : 0) |
+                     (astarButtonC.checked ? 4 : 0);
+    buf[3] = buttonVals;
+
     // byte 4 is din 
     var dinVals = (astarDio0Input.checked ? 1 : 0) | 
                   (astarDio1Input.checked ? 2 : 0) |
@@ -208,6 +262,12 @@ socket.on('incomingBuffer', function (buf) {
     astarDio4Output.innerHTML = doutVals[4] ? 'ON' : 'OFF';
     astarDio5Output.innerHTML = doutVals[5] ? 'ON' : 'OFF';
 
+    var pwm0 = ((((buf[19] << 8) & 0xFF00) | (buf[20] & 0xFF)) << 16) >> 16;
+    var pwm1 = ((((buf[21] << 8) & 0xFF00) | (buf[22] & 0xFF)) << 16) >> 16;
+
+    astarPwm0Output.innerHTML = pwm0;
+    astarPwm1Output.innerHTML = pwm1;
+
     arduinoBuf = buf;
 });
 
@@ -215,6 +275,10 @@ socket.on('hostInput', function (data) {
     hostDio0Input.innerHTML = data.dinVals[0] ? 'ON' : 'OFF';
     hostDio1Input.innerHTML = data.dinVals[1] ? 'ON' : 'OFF';
     hostDio2Input.innerHTML = data.dinVals[2] ? 'ON' : 'OFF';
+
+    hostButtonA.innerHTML = data.buttonA ? 'ON' : 'OFF';
+    hostButtonB.innerHTML = data.buttonB ? 'ON' : 'OFF';
+    hostButtonC.innerHTML = data.buttonC ? 'ON' : 'OFF';
 
     hostAin0.innerHTML = data.ainVals[0];
     hostAin1.innerHTML = data.ainVals[1];
