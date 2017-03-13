@@ -3,7 +3,7 @@
 const EventEmitter = require('events');
 const Constants = require('./constants');
 const PololuAstarBoard = require('./pololu-astar-board');
-const FakeI2C = require('./fakei2c');
+const I2C = require('i2c-bus');
 
 class Robot extends EventEmitter {
     constructor(robotConfig) {
@@ -13,7 +13,7 @@ class Robot extends EventEmitter {
         this.d_portDeviceMaps = {};
         this.d_ready = false;
 
-        this.d_i2c = FakeI2C;
+        this.d_i2c = I2C.openSync(1);
 
         this.setupDevices();
     }

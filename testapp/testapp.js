@@ -1,11 +1,25 @@
+'use strict';
+
+var mockery = require('mockery');
+var mockI2c = require('../mocks/mock-i2c');
+
+mockery.enable({
+    warnOnReplace: false,
+    warnOnUnregistered: false
+});
+
+mockery.registerMock('i2c-bus', mockI2c);
+
 var express = require('express');
 var app = express();
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
 
 const Robot = require('../index');
-const FakeI2C = require('../fakei2c');
 const Constants = require('../constants');
+
+const I2C = require('i2c-bus');
+var s_i2c = I2C.openSync(1);
 
 var robot = new Robot({
     devices: [
@@ -108,13 +122,14 @@ app.get('/', function (req, res) {
 	res.sendFile(__dirname + '/index.html');
 });
 
-FakeI2C.on('bufferModified', function (buf) {
+s_i2c.on('bufferModified', function () {
     var arrBuf = [];
-    for (var i = 0; i < buf.length; i++) {
-        arrBuf.push(buf[i]);
+    var nBuf = s_i2c.rawBuf;
+    for (var i = 0; i < 23; i++) {
+        arrBuf.push(nBuf[i]);
     }
     io.sockets.emit('incomingBuffer', arrBuf);
-})
+});
 
 setInterval(function() {
     // Generate the display JSON
@@ -156,7 +171,7 @@ io.on('connection', function (socket) {
 
     socket.on('arduinoBuffer', function(buf) {
         var buffer = Buffer.from(buf);
-        FakeI2C.writeSync(20, 0, buffer, true);
+        s_i2c.writeI2cBlockSync(20, 0, 23, buffer);
     });
 });
 

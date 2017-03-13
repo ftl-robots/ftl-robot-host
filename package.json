@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/zhiquanyeo/ftl-robot-host/issues"
   },
-  "homepage": "https://github.com/zhiquanyeo/ftl-robot-host#readme"
+  "homepage": "https://github.com/zhiquanyeo/ftl-robot-host#readme",
+  "devDependencies": {
+    "mockery": "^2.0.0"
+  }
 }

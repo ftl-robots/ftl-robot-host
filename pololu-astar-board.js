@@ -1,3 +1,5 @@
+'use strict';
+
 const RobotDevice = require('./device');
 const Constants = require('./constants');
 
@@ -90,7 +92,8 @@ class PololuAstarBoard extends RobotDevice {
     getBoardStatus() {
         // Make an i2c call to the board to get status 
         // Read 23 bytes from the board
-        var buf = this.d_i2c.readSync(this.d_addr, 0x0, 23);
+        var buf = Buffer.allocUnsafe(23);
+        this.d_i2c.readI2cBlockSync(this.d_addr, 0x0, 23, buf);
         this.d_lastReceivedBuffer = buf;
 
         // Check if we are in write mode
@@ -160,7 +163,7 @@ class PololuAstarBoard extends RobotDevice {
         this.d_inFlush = true;
         // Copy the master buffer 
         var outBuf = Buffer.from(this.d_masterBuffer);
-        this.d_i2c.writeSync(this.d_addr, 0, outBuf);
+        this.d_i2c.writeI2cBlockSync(this.d_addr, 0x0, outBuf.length, outBuf);
         this.d_inFlush = false;
         this.d_inWrite = false;
         this.d_flushTimer = undefined;
