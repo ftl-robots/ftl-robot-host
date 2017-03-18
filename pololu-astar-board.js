@@ -196,29 +196,37 @@ class PololuAstarBoard extends RobotDevice {
         this.d_inFlush = true;
         // Copy the master buffer 
         var outBuf = Buffer.from(this.d_masterBuffer);
-        this.d_i2c.writeI2cBlockSync(this.d_addr, 0x0, outBuf.length, outBuf);
-        this.d_inFlush = false;
-        this.d_inWrite = false;
-        this.d_flushTimer = undefined;
-
-        if (this.d_writeBuffer) {
-            // If the write buffer exists, copy the OUT bits to master buffer 
-            // copy the config bits
-            this.d_masterBuffer[0] = this.d_writeBuffer[0];
-            this.d_masterBuffer[1] = this.d_writeBuffer[1];
-            this.d_masterBuffer[2] = this.d_writeBuffer[2];
-
-            for (var i = MMAP_OUTPUT_SECTION; i < 25; i++) {
-                this.d_masterBuffer[i] = this.d_writeBuffer[i];
+        //this.d_i2c.writeI2cBlockSync(this.d_addr, 0x0, outBuf.length, outBuf);
+        this.d_i2c.writeI2cBlock(this.d_addr, 0x0, outBuf.length, outBuf, (err, bytesWritten, buf) => {
+            if (err) {
+                console.warn('Error writing, will try again later');
             }
+            else {
+                this.d_inFlush = false;
+                this.d_inWrite = false;
+                this.d_flushTimer = undefined;
 
-            // Clear out the flush buffer
-            this.d_writeBuffer = undefined;
+                if (this.d_writeBuffer) {
+                    // If the write buffer exists, copy the OUT bits to master buffer 
+                    // copy the config bits
+                    this.d_masterBuffer[0] = this.d_writeBuffer[0];
+                    this.d_masterBuffer[1] = this.d_writeBuffer[1];
+                    this.d_masterBuffer[2] = this.d_writeBuffer[2];
 
-            // set up the write mode again
-            this.d_inWrite = true;
-            this.d_flushTimer = setTimeout(this._flushWriteBuffer.bind(this), 25);
-        }
+                    for (var i = MMAP_OUTPUT_SECTION; i < 25; i++) {
+                        this.d_masterBuffer[i] = this.d_writeBuffer[i];
+                    }
+
+                    // Clear out the flush buffer
+                    this.d_writeBuffer = undefined;
+
+                    // set up the write mode again
+                    this.d_inWrite = true;
+                    this.d_flushTimer = setTimeout(this._flushWriteBuffer.bind(this), 25);
+                }
+            }
+        });
+        
     }
 
     _writeByte(register, byte) {
