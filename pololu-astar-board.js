@@ -34,6 +34,35 @@ var MMAP_RIGHT_MOTOR = 23;
 var MMAP_OUTPUT_SECTION = MMAP_LED_VALS;
 var MMAP_MOTOR_SECTION = MMAP_LEFT_MOTOR;
 
+// ===  Memory Map  ===
+var MMAP_CONFIG_SECT_START = 0;
+var MMAP_CONFIG_SECT_LEN = 3;
+
+
+// --- INPUT SECTION ---
+var MMAP_INPUT_SECT_START = 3;
+var MMAP_INPUT_SECT_LEN = 16;
+// - Absolute Positions in the main buffer
+var MMAP_INPUT_BUTTONS = 3;
+var MMAP_INPUT_DIGITAL = 4;
+var MMAP_INPUT_ANALOG = 5; // These are uint_16ts
+var MMAP_INPUT_BATT = 17;
+// - Relative Positions in the partial buffer (0-based)
+var MMAP_INPUT_BUTTONS_REL = 0;
+var MMAP_INPUT_DIGITAL_REL = 1;
+var MMAP_INPUT_ANALOG_REL = 2;
+var MMAP_INPUT_BATT_REL = 14;
+
+// --- OUTPUT SECTION ---
+var MMAP_OUTPUT_SECT_START = 19;
+var MMAP_OUTPUT_SECT_LEN = 13;
+var MMAP_OUTPUT_LED_RED = 19;
+var MMAP_OUTPUT_LED_GREEN = 20;
+var MMAP_OUTPUT_LED_YELLOW = 21;
+var MMAP_OUTPUT_DIGITAL = 22; // 6 of these, bytes
+var MMAP_OUTPUT_MOTOR0 = 28;
+var MMAP_OUTPUT_MOTOR1 = 30;
+
 class PololuAstarBoard extends RobotDevice {
     constructor(i2c, addr, id, config) {
         super(id, 'PololuAstarBoard', Constants.InterfaceTypes.I2C, config);
@@ -65,20 +94,13 @@ class PololuAstarBoard extends RobotDevice {
                 false,
                 false
             ],
-            digitalOut: [
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-            ],
             analogIn: [
                 0.0,
                 0.0,
                 0.0,
                 0.0,
-                0.0
+                0.0,
+                0.0 // <-- This is a fake value
             ]
         };
 
@@ -103,6 +125,48 @@ class PololuAstarBoard extends RobotDevice {
 
         this.d_lastReceivedTimestamp = 0;
 
+        this.d_lastUpdate = 0;
+    }
+
+    getBoardInputValue() {
+        // Just grab the INPUT section
+        var buf = Buffer.allocUnsafe(MMAP_INPUT_SECT_LEN);
+        this.d_i2c.readI2cBlock(this.d_addr, 
+                                MMAP_INPUT_SECT_START, 
+                                MMAP_INPUT_SECT_LEN, buf, 
+                                (err, bytesRead, inpBuf) => {
+            if (err) {
+                // Skip
+            }
+            else {
+                var timestamp = Date.now();
+                if (timestamp > this.d_lastUpdate) {
+                    // We can just read right off the buffer
+                    var buttonVals = inpBuf[MMAP_INPUT_BUTTONS_REL];
+                    var dinVals = inpBuf[MMAP_INPUT_DIGITAL_REL];
+                    var ainVals = [0, 0, 0, 0, 0, 0];
+
+                    // Load analog values. Assume network byte order (big endian)
+                    for (var i = 0; i < 6; i++) {
+                        var byteStart = MMAP_INPUT_ANALOG_REL + (i * 2);
+                        ainVals[i] = (inpBuf[byteStart] << 8) + (buf[byteStart + 1]);
+                        this.d_boardState.analogIn[i] = ainVals[i];
+                    }
+
+                    var battMV = (buf[MMAP_INPUT_BATT_REL] << 8) + buf[MMAP_INPUT_BATT_REL + 1];
+
+                    this.d_boardState.buttons.buttonA = buttonVals & 0x1;
+                    this.d_boardState.buttons.buttonB = (buttonVals >> 0x1) & 0x1;
+                    this.d_boardState.buttons.buttonC = (buttonVals >> 0x2) & 0x1;
+
+                    for (var i = 0; i < 6; i++) {
+                        this.d_boardState.digitalIn[i] = (dinVals >> i) & 0x1;
+                    }
+
+                    this.d_boardState.battMV = battMV;
+                }
+            }
+        });
     }
 
     getBoardStatus() {
@@ -250,6 +314,23 @@ class PololuAstarBoard extends RobotDevice {
         }
     }
 
+    // All of these operate on the size of the full buffer
+    _writeByte2(register, byte) {
+        this.d_i2c.writeByte(this.d_addr, register, byte, (err) => {
+            if (err) {
+                console.warn('Could not writeByte: ', err);
+            }
+        });
+    }
+
+    _writeWord2(register, word) {
+        this.d_i2c.writeWord(this.d_addr, register, word, (err) => {
+            if (err) {
+                console.warn('Could not writeWord: ', err);
+            }
+        });
+    }
+
     // === External Interface
     configurePin(channel, mode) {
         // 0/1 -> byte 0
@@ -313,40 +394,55 @@ class PololuAstarBoard extends RobotDevice {
     }
 
     _writeDigital(channel, value) {
-        var oldByte = this.d_masterBuffer[MMAP_DOUT_VALS];
-        var newByte;
-        if (value) {
-            newByte = oldByte | (1 << channel);
-        }
-        else {
-            newByte = oldByte & ~(1 << channel);
-        }
+        // var oldByte = this.d_masterBuffer[MMAP_DOUT_VALS];
+        // var newByte;
+        // if (value) {
+        //     newByte = oldByte | (1 << channel);
+        // }
+        // else {
+        //     newByte = oldByte & ~(1 << channel);
+        // }
 
-        this._writeByte(MMAP_DOUT_VALS, newByte);
+        this._writeByte2(MMAP_OUTPUT_DIGITAL + channel, value ? 1 : 0);
+
+        // this._writeByte(MMAP_DOUT_VALS, newByte);
     }
 
     _writeLED(channel, value) {
-        var oldByte = this.d_masterBuffer[MMAP_LED_VALS];
-        var newByte;
-        var bitOffset = 0;
+        // var oldByte = this.d_masterBuffer[MMAP_LED_VALS];
+        // var newByte;
+        // var bitOffset = 0;
+        // if (channel === 'RED') {
+        //     bitOffset = 0;
+        // }
+        // else if (channel === 'GREEN') {
+        //     bitOffset = 1;
+        // }
+        // else if (channel === 'YELLOW') {
+        //     bitOffset = 2;
+        // }
+
+        // if (value) {
+        //     newByte = oldByte | (1 << bitOffset);
+        // }
+        // else {
+        //     newByte = oldByte & ~(1 << bitOffset);
+        // }
+
+        // this._writeByte(MMAP_LED_VALS, newByte);
+
+        var reg = MMAP_OUTPUT_LED_RED;
         if (channel === 'RED') {
-            bitOffset = 0;
+            reg = MMAP_OUTPUT_LED_RED;
         }
         else if (channel === 'GREEN') {
-            bitOffset = 1;
+            reg = MMAP_OUTPUT_LED_GREEN;
         }
         else if (channel === 'YELLOW') {
-            bitOffset = 2;
+            reg = MMAP_OUTPUT_LED_YELLOW;
         }
 
-        if (value) {
-            newByte = oldByte | (1 << bitOffset);
-        }
-        else {
-            newByte = oldByte & ~(1 << bitOffset);
-        }
-
-        this._writeByte(MMAP_LED_VALS, newByte);
+        this._writeByte2(reg, value ? 1 : 0);
     }
 
     _writePWM(channel, value) {
@@ -378,9 +474,15 @@ class PololuAstarBoard extends RobotDevice {
 
         //flip to follow WPILib format
         output = -output;
-        var chOffset = MMAP_MOTOR_SECTION + (channel * 2);
+        // var chOffset = MMAP_MOTOR_SECTION + (channel * 2);
 
-        this._writeWord(chOffset, (output & 0xFFFF));
+        // this._writeWord(chOffset, (output & 0xFFFF));
+
+        var reg = MMAP_OUTPUT_MOTOR0;
+        if (channel === 1) {
+            reg = MMAP_OUTPUT_MOTOR1;
+        }
+        this._writeWord2(reg, (output & 0xFFFF));
     }
 
     _readDigital(channel) {

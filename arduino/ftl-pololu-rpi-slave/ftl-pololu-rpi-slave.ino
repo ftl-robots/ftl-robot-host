@@ -18,10 +18,12 @@ struct Data {
   uint16_t batteryMillivolts; // 17 - 18
 
   //--- Output (rpi -> board)
-  byte ledVals; // 19
-  byte doutVals; // 20
-  int16_t leftMotor; // 21-22
-  int16_t rightMotor; // 23-24
+  bool ledValRed; // 19
+  bool ledValGreen; // 20
+  bool ledValYellow; // 21
+  bool doutVals[6]; // 22-27
+  int16_t leftMotor; // 28-29
+  int16_t rightMotor; // 30-31
 };
 
 PololuRPiSlave<struct Data, 5> slave;
@@ -121,13 +123,12 @@ void loop() {
   slave.buffer.batteryMillivolts = readBatteryMillivoltsSV();
 
   // Handle the outputs
-  ledYellow((slave.buffer.ledVals >> 2) & 0x1);
-  ledGreen((slave.buffer.ledVals >> 1) & 0x1);
-  ledRed((slave.buffer.ledVals) & 0x1);
+  ledYellow(slave.buffer.ledValYellow);
+  ledGreen(slave.buffer.ledValGreen);
+  ledRed(slave.buffer.ledValRed);
 
   for (uint8_t i = 0; i < 6; i++) {
-    byte val = (slave.buffer.doutVals >> i) & 0x1;
-    doDigitalWrite(i, val);
+    doDigitalWrite(i, slave.buffer.doutVals[i]);
   }
 
   motors.setSpeeds(slave.buffer.leftMotor, slave.buffer.rightMotor);
