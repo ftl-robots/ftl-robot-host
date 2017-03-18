@@ -109,55 +109,60 @@ class PololuAstarBoard extends RobotDevice {
         // Make an i2c call to the board to get status 
         // Read 23 bytes from the board
         var buf = Buffer.allocUnsafe(25);
-        this.d_i2c.i2cRead(this.d_addr, 25, buf, (err, bytesRead, buf) => {
+        this.d_i2c.readI2cBlock(this.d_addr, 0x0, 25, buf, (err, bytesRead, buf) => {
             if (err) {
-                console.warn("Error: ", err);
+                // TODO log somewhere else?
+                // console.warn("Error: ", err);
             }
             else {
                 var timestamp = Date.now();
                 if (timestamp > this.d_lastReceivedTimestamp) {
                     this.d_lastReceivedBuffer = buf;
                     this.d_lastReceivedTimestamp = timestamp;
+
+                    // Check if we are in write mode
+                    if (this.d_inWrite) {
+                        // Copy the first chunk of bytes up to MMAP_LED_VALS (that represents the beginning of OUTPUT)
+                        // these deal with the inputs
+                        for (var i = 0; i < MMAP_OUTPUT_SECTION; i++) {
+                            this.d_masterBuffer[i] = this.d_lastReceivedBuffer[i];
+                        }
+                    }
+                    else {
+                        // Not in write, just copy to the master buffer 
+                        if (this.d_lastReceivedBuffer) {
+                            this.d_masterBuffer = Buffer.from(this.d_lastReceivedBuffer);
+                        }
+                    }
+
+                    // The parts we really care about are bytes 3 to 18
+                    var buttonVals = buf[MMAP_BUTTON_VALS];
+                    var dinVals = buf[MMAP_DIN_VALS];
+                    var ainVals = [0, 0, 0, 0, 0, 0];
+                    for (var i = 0; i < 6; i++) {
+                        // assume big-endian (network byte order)
+                        var byteStart = MMAP_ANALOG_VALS + (i * 2);
+                        ainVals[i] = (buf[byteStart] << 8) + (buf[byteStart + 1]);
+                        this.d_boardState.analogIn[i] = ainVals[i];
+                    }
+                    var battMV = (buf[MMAP_BATTERY] << 8) + buf[MMAP_BATTERY + 1];
+
+                    this.d_boardState.buttons.buttonA = buttonVals & 0x1;
+                    this.d_boardState.buttons.buttonB = (buttonVals >> 0x1) & 0x1;
+                    this.d_boardState.buttons.buttonC = (buttonVals >> 0x2) & 0x1;
+
+                    for (var i = 0; i < 6; i++) {
+                        this.d_boardState.digitalIn[i] = (dinVals >> i) & 0x1;
+                    }
+
+                    this.d_boardState.battMV = battMV;
+                    
+                    
                 }
             }
         });
 
-        // Check if we are in write mode
-        if (this.d_inWrite) {
-            // Copy the first chunk of bytes up to MMAP_LED_VALS (that represents the beginning of OUTPUT)
-            // these deal with the inputs
-            for (var i = 0; i < MMAP_OUTPUT_SECTION; i++) {
-                this.d_masterBuffer[i] = this.d_lastReceivedBuffer[i];
-            }
-        }
-        else {
-            // Not in write, just copy to the master buffer 
-            if (this.d_lastReceivedBuffer) {
-                this.d_masterBuffer = Buffer.from(this.d_lastReceivedBuffer);
-            }
-        }
-
-        // The parts we really care about are bytes 3 to 18
-        var buttonVals = buf[MMAP_BUTTON_VALS];
-        var dinVals = buf[MMAP_DIN_VALS];
-        var ainVals = [0, 0, 0, 0, 0, 0];
-        for (var i = 0; i < 6; i++) {
-            // assume big-endian (network byte order)
-            var byteStart = MMAP_ANALOG_VALS + (i * 2);
-            ainVals[i] = (buf[byteStart] << 8) + (buf[byteStart + 1]);
-            this.d_boardState.analogIn[i] = ainVals[i];
-        }
-        var battMV = (buf[MMAP_BATTERY] << 8) + buf[MMAP_BATTERY + 1];
-
-        this.d_boardState.buttons.buttonA = buttonVals & 0x1;
-        this.d_boardState.buttons.buttonB = (buttonVals >> 0x1) & 0x1;
-        this.d_boardState.buttons.buttonC = (buttonVals >> 0x2) & 0x1;
-
-        for (var i = 0; i < 6; i++) {
-            this.d_boardState.digitalIn[i] = (dinVals >> i) & 0x1;
-        }
-
-        this.d_boardState.battMV = battMV;
+        
     }
 
     // Buffered writes 
