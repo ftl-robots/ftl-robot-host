@@ -132,7 +132,9 @@ class PololuAstarBoard extends RobotDevice {
         }
         else {
             // Not in write, just copy to the master buffer 
-            this.d_masterBuffer = Buffer.from(this.d_lastReceivedBuffer);
+            if (this.d_lastReceivedBuffer) {
+                this.d_masterBuffer = Buffer.from(this.d_lastReceivedBuffer);
+            }
         }
 
         // The parts we really care about are bytes 3 to 18
