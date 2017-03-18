@@ -21,32 +21,19 @@ const PIN_MAP = {
     AIN4: 5
 }
 
-// Memory Mapping for i2c
-var MMAP_BUTTON_VALS = 3
-var MMAP_DIN_VALS = 4;
-var MMAP_ANALOG_VALS = 5; // This represents the start of the array 5-16
-var MMAP_BATTERY = 17; // 17-18
-var MMAP_LED_VALS = 19;
-var MMAP_DOUT_VALS = 20;
-var MMAP_LEFT_MOTOR = 21;
-var MMAP_RIGHT_MOTOR = 23;
-
-var MMAP_OUTPUT_SECTION = MMAP_LED_VALS;
-var MMAP_MOTOR_SECTION = MMAP_LEFT_MOTOR;
-
 // ===  Memory Map  ===
 var MMAP_CONFIG_SECT_START = 0;
-var MMAP_CONFIG_SECT_LEN = 3;
+var MMAP_CONFIG_SECT_LEN = 1;
 
 
 // --- INPUT SECTION ---
-var MMAP_INPUT_SECT_START = 3;
+var MMAP_INPUT_SECT_START = 1;
 var MMAP_INPUT_SECT_LEN = 16;
 // - Absolute Positions in the main buffer
-var MMAP_INPUT_BUTTONS = 3;
-var MMAP_INPUT_DIGITAL = 4;
-var MMAP_INPUT_ANALOG = 5; // These are uint_16ts
-var MMAP_INPUT_BATT = 17;
+var MMAP_INPUT_BUTTONS = 1;
+var MMAP_INPUT_DIGITAL = 2;
+var MMAP_INPUT_ANALOG = 3; // These are uint_16ts
+var MMAP_INPUT_BATT = 15;
 // - Relative Positions in the partial buffer (0-based)
 var MMAP_INPUT_BUTTONS_REL = 0;
 var MMAP_INPUT_DIGITAL_REL = 1;
@@ -54,14 +41,14 @@ var MMAP_INPUT_ANALOG_REL = 2;
 var MMAP_INPUT_BATT_REL = 14;
 
 // --- OUTPUT SECTION ---
-var MMAP_OUTPUT_SECT_START = 19;
+var MMAP_OUTPUT_SECT_START = 17;
 var MMAP_OUTPUT_SECT_LEN = 13;
-var MMAP_OUTPUT_LED_RED = 19;
-var MMAP_OUTPUT_LED_GREEN = 20;
-var MMAP_OUTPUT_LED_YELLOW = 21;
-var MMAP_OUTPUT_DIGITAL = 22; // 6 of these, bytes
-var MMAP_OUTPUT_MOTOR0 = 28;
-var MMAP_OUTPUT_MOTOR1 = 30;
+var MMAP_OUTPUT_LED_RED = 17;
+var MMAP_OUTPUT_LED_GREEN = 18;
+var MMAP_OUTPUT_LED_YELLOW = 19;
+var MMAP_OUTPUT_DIGITAL = 20; // 6 of these, bytes
+var MMAP_OUTPUT_MOTOR0 = 26;
+var MMAP_OUTPUT_MOTOR1 = 28;
 
 class PololuAstarBoard extends RobotDevice {
     constructor(i2c, addr, id, config) {
@@ -121,7 +108,7 @@ class PololuAstarBoard extends RobotDevice {
 
 
         // Set up polling
-        this.d_i2cPolling = setInterval(this.getBoardStatus.bind(this), 100);
+        this.d_i2cPolling = setInterval(this.getBoardInputValue.bind(this), 100);
 
         this.d_lastReceivedTimestamp = 0;
 
@@ -169,153 +156,8 @@ class PololuAstarBoard extends RobotDevice {
         });
     }
 
-    getBoardStatus() {
-        // Make an i2c call to the board to get status 
-        // Read 23 bytes from the board
-        var buf = Buffer.allocUnsafe(25);
-        this.d_i2c.readI2cBlock(this.d_addr, 0x0, 25, buf, (err, bytesRead, buf) => {
-            if (err) {
-                // TODO log somewhere else?
-                // console.warn("Error: ", err);
-            }
-            else {
-                var timestamp = Date.now();
-                if (timestamp > this.d_lastReceivedTimestamp) {
-                    this.d_lastReceivedBuffer = buf;
-                    this.d_lastReceivedTimestamp = timestamp;
-
-                    // Check if we are in write mode
-                    if (this.d_inWrite) {
-                        // Copy the first chunk of bytes up to MMAP_LED_VALS (that represents the beginning of OUTPUT)
-                        // these deal with the inputs
-                        for (var i = 0; i < MMAP_OUTPUT_SECTION; i++) {
-                            this.d_masterBuffer[i] = this.d_lastReceivedBuffer[i];
-                        }
-                    }
-                    else {
-                        // Not in write, just copy to the master buffer 
-                        if (this.d_lastReceivedBuffer) {
-                            this.d_masterBuffer = Buffer.from(this.d_lastReceivedBuffer);
-                        }
-                    }
-
-                    // The parts we really care about are bytes 3 to 18
-                    var buttonVals = buf[MMAP_BUTTON_VALS];
-                    var dinVals = buf[MMAP_DIN_VALS];
-                    var ainVals = [0, 0, 0, 0, 0, 0];
-                    for (var i = 0; i < 6; i++) {
-                        // assume big-endian (network byte order)
-                        var byteStart = MMAP_ANALOG_VALS + (i * 2);
-                        ainVals[i] = (buf[byteStart] << 8) + (buf[byteStart + 1]);
-                        this.d_boardState.analogIn[i] = ainVals[i];
-                    }
-                    var battMV = (buf[MMAP_BATTERY] << 8) + buf[MMAP_BATTERY + 1];
-
-                    this.d_boardState.buttons.buttonA = buttonVals & 0x1;
-                    this.d_boardState.buttons.buttonB = (buttonVals >> 0x1) & 0x1;
-                    this.d_boardState.buttons.buttonC = (buttonVals >> 0x2) & 0x1;
-
-                    for (var i = 0; i < 6; i++) {
-                        this.d_boardState.digitalIn[i] = (dinVals >> i) & 0x1;
-                    }
-
-                    this.d_boardState.battMV = battMV;
-
-
-                }
-            }
-        });
-
-        
-    }
-
-    // Buffered writes 
-    // if we don't have a tempBuffer, create one
-    // set a timeout for 10-25ms before we send it 
-    _setupWrite() {
-        if (this.d_inFlush && !this.d_writeBuffer) {
-            // If we are in flush mode, create the write buffer if we need to
-            this.d_writeBuffer = Buffer.from(this.d_masterBuffer);
-        }
-
-        if (this.d_inFlush) {
-            this.d_activeWriteBuffer = this.d_writeBuffer;
-        }
-        else {
-            this.d_activeWriteBuffer = this.d_masterBuffer;
-        }
-        
-        // If we're not in write mode yet, set it up
-        // We just need to set the flag, since receive buffer does everything else
-        if (!this.d_inWrite) {
-            this.d_inWrite = true;
-        }
-
-        if (!this.d_flushTimer) {
-            this.d_flushTimer = setTimeout(this._flushWriteBuffer.bind(this), 25);
-        }
-    }
-
-    _flushWriteBuffer() {
-        this.d_inFlush = true;
-        // Copy the master buffer 
-        var outBuf = Buffer.from(this.d_masterBuffer);
-        //this.d_i2c.writeI2cBlockSync(this.d_addr, 0x0, outBuf.length, outBuf);
-        this.d_i2c.writeI2cBlock(this.d_addr, 0x0, outBuf.length, outBuf, (err, bytesWritten, buf) => {
-            if (err) {
-                console.warn('Error writing, will try again later');
-            }
-            else {
-                this.d_inFlush = false;
-                this.d_inWrite = false;
-                this.d_flushTimer = undefined;
-
-                if (this.d_writeBuffer) {
-                    // If the write buffer exists, copy the OUT bits to master buffer 
-                    // copy the config bits
-                    this.d_masterBuffer[0] = this.d_writeBuffer[0];
-                    this.d_masterBuffer[1] = this.d_writeBuffer[1];
-                    this.d_masterBuffer[2] = this.d_writeBuffer[2];
-
-                    for (var i = MMAP_OUTPUT_SECTION; i < 25; i++) {
-                        this.d_masterBuffer[i] = this.d_writeBuffer[i];
-                    }
-
-                    // Clear out the flush buffer
-                    this.d_writeBuffer = undefined;
-
-                    // set up the write mode again
-                    this.d_inWrite = true;
-                    this.d_flushTimer = setTimeout(this._flushWriteBuffer.bind(this), 25);
-                }
-            }
-        });
-        
-    }
-
-    _writeByte(register, byte) {
-        this._setupWrite();
-
-        this.d_activeWriteBuffer[register] = byte;
-    }
-
-    _writeWord(register, word) {
-        this._setupWrite();
-
-        this.d_activeWriteBuffer[register] = (word >> 8) & 0xFF;
-        this.d_activeWriteBuffer[register + 1] = word & 0xFF;
-    }
-
-    _writeBuffer(register, buffer) {
-        this._setupWrite();
-
-        for (var i = 0; i < buffer.length; i++) {
-            this.d_activeWriteBuffer[register + i] = buffer[i];
-        }
-    }
-
     // All of these operate on the size of the full buffer
-    _writeByte2(register, byte) {
+    _writeByte(register, byte) {
         this.d_i2c.writeByte(this.d_addr, register, byte, (err) => {
             if (err) {
                 console.warn('Could not writeByte: ', err);
@@ -323,7 +165,7 @@ class PololuAstarBoard extends RobotDevice {
         });
     }
 
-    _writeWord2(register, word) {
+    _writeWord(register, word) {
         this.d_i2c.writeWord(this.d_addr, register, word, (err) => {
             if (err) {
                 console.warn('Could not writeWord: ', err);
@@ -360,7 +202,9 @@ class PololuAstarBoard extends RobotDevice {
             outByte = (configByte & 0xF0) | (newSetting & 0xF);
         }
 
-        this._writeByte(configByteIdx, outByte);
+        // TODO Convert this to a single byte just for configuration?
+
+        // this._writeByte(configByteIdx, outByte);
     }
 
     write(portType, channel, value) {
@@ -394,43 +238,10 @@ class PololuAstarBoard extends RobotDevice {
     }
 
     _writeDigital(channel, value) {
-        // var oldByte = this.d_masterBuffer[MMAP_DOUT_VALS];
-        // var newByte;
-        // if (value) {
-        //     newByte = oldByte | (1 << channel);
-        // }
-        // else {
-        //     newByte = oldByte & ~(1 << channel);
-        // }
-
-        this._writeByte2(MMAP_OUTPUT_DIGITAL + channel, value ? 1 : 0);
-
-        // this._writeByte(MMAP_DOUT_VALS, newByte);
+        this._writeByte(MMAP_OUTPUT_DIGITAL + channel, value ? 1 : 0);
     }
 
     _writeLED(channel, value) {
-        // var oldByte = this.d_masterBuffer[MMAP_LED_VALS];
-        // var newByte;
-        // var bitOffset = 0;
-        // if (channel === 'RED') {
-        //     bitOffset = 0;
-        // }
-        // else if (channel === 'GREEN') {
-        //     bitOffset = 1;
-        // }
-        // else if (channel === 'YELLOW') {
-        //     bitOffset = 2;
-        // }
-
-        // if (value) {
-        //     newByte = oldByte | (1 << bitOffset);
-        // }
-        // else {
-        //     newByte = oldByte & ~(1 << bitOffset);
-        // }
-
-        // this._writeByte(MMAP_LED_VALS, newByte);
-
         var reg = MMAP_OUTPUT_LED_RED;
         if (channel === 'RED') {
             reg = MMAP_OUTPUT_LED_RED;
@@ -442,7 +253,7 @@ class PololuAstarBoard extends RobotDevice {
             reg = MMAP_OUTPUT_LED_YELLOW;
         }
 
-        this._writeByte2(reg, value ? 1 : 0);
+        this._writeByte(reg, value ? 1 : 0);
     }
 
     _writePWM(channel, value) {
@@ -474,15 +285,12 @@ class PololuAstarBoard extends RobotDevice {
 
         //flip to follow WPILib format
         output = -output;
-        // var chOffset = MMAP_MOTOR_SECTION + (channel * 2);
-
-        // this._writeWord(chOffset, (output & 0xFFFF));
 
         var reg = MMAP_OUTPUT_MOTOR0;
         if (channel === 1) {
             reg = MMAP_OUTPUT_MOTOR1;
         }
-        this._writeWord2(reg, (output & 0xFFFF));
+        this._writeWord(reg, (output & 0xFFFF));
     }
 
     _readDigital(channel) {

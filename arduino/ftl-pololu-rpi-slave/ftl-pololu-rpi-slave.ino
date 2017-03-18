@@ -7,23 +7,21 @@
 
 struct Data {
   //--- Configuration
-  byte config01; // 0
-  byte config23; // 1
-  byte config45; // 2
+  byte configRegister; // 0
 
   //--- Input (board -> rpi)
-  byte buttonVals; // 3
-  byte dinVals; // 4
-  uint16_t analog[6]; // 5 - 16
-  uint16_t batteryMillivolts; // 17 - 18
+  byte buttonVals; // 1
+  byte dinVals; // 2
+  uint16_t analog[6]; // 3 - 14
+  uint16_t batteryMillivolts; // 15 - 16
 
   //--- Output (rpi -> board)
-  bool ledValRed; // 19
-  bool ledValGreen; // 20
-  bool ledValYellow; // 21
-  bool doutVals[6]; // 22-27
-  int16_t leftMotor; // 28-29
-  int16_t rightMotor; // 30-31
+  bool ledValRed; // 17
+  bool ledValGreen; // 18
+  bool ledValYellow; // 19
+  bool doutVals[6]; // 20-25
+  int16_t leftMotor; // 26-27
+  int16_t rightMotor; // 28-29
 };
 
 PololuRPiSlave<struct Data, 5> slave;
@@ -35,11 +33,11 @@ AStar32U4ButtonC buttonC;
 
 int digitalPinMap[6] = {0, 1, 7, 8, 15, 16};
 int analogPinMap[5] = {A0, A2, A3, A4, A5};
-byte pinConfigs[6];
+byte digitalPinConfigs[6] = {0, 0, 0, 0, 0, 0};
 
 int getPinMode(int vPin) {
-  if (pinConfigs[vPin] & 0x3 == 1 ||
-      pinConfigs[vPin] & 0x3 == 2) {
+  if (digitalPinConfigs[vPin] == 1 ||
+      digitalPinConfigs[vPin] == 2) {
     return PIN_MODE_INPUT;      
   }
   return PIN_MODE_OUTPUT;
@@ -73,35 +71,30 @@ void loop() {
   // data, including recent master writes
   slave.updateBuffer();
 
-  // See if we need to make any configuration changes
-  // [ ch0 config ] [ ch1 config ]
-  pinConfigs[0] = (slave.buffer.config01 >> 4) & 0xF;
-  pinConfigs[1] = (slave.buffer.config01) & 0xF;
-  pinConfigs[2] = (slave.buffer.config23 >> 4) & 0xF;
-  pinConfigs[3] = (slave.buffer.config23) & 0xF;
-  pinConfigs[4] = (slave.buffer.config45 >> 4) & 0xF;
-  pinConfigs[5] = (slave.buffer.config45) & 0xF;
-
-  for (uint8_t i = 0; i < 6; i++) {
-    bool hasUpdate = (pinConfigs[i] >> 2) & 0x1;
-    if (hasUpdate) {
-      byte mode = pinConfigs[i] & 0x3;
+  // If the high 3 bits of the config byte are set, then we have changes
+  byte configByte = slave.buffer.configRegister;
+  byte configCmd = (configByte >> 5) & 0xF;
+  if ( configCmd ) {
+    // We have things to configure
+    if (configCmd == 0x1) {
+      // Pin config
+      int pin = (configByte >> 2) & 0x7;
+      int mode = configByte & 0x3;
       if (mode == 0) {
-        pinMode(digitalPinMap[i], OUTPUT);
+        pinMode(digitalPinMap[pin], OUTPUT);
       }
-      else if(mode == 1) {
-        pinMode(digitalPinMap[i], INPUT);
+      else if (mode == 1) {
+        pinMode(digitalPinMap[pin], INPUT);
       }
-      else if(mode == 2) {
-        pinMode(digitalPinMap[i], INPUT_PULLUP);
+      else if (mode == 2) {
+        pinMode(digitalPinMap[pin], INPUT_PULLUP);
       }
-      // unset the flag locally
-      pinConfigs[i] = pinConfigs[i] & ~0x4;
+      digitalPinConfigs[pin] = mode;
     }
   }
 
-  // Update the buffer
-  slave.buffer.config01 = slave.buffer.config01 & ~0x68;
+  // Zero out the register
+  slave.buffer.configRegister = 0;
   
   // Gather up our input 
   byte buttonVals = (buttonC.isPressed() ? 0x4 : 0x0) | 
