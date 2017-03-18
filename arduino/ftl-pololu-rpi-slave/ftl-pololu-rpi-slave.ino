@@ -14,14 +14,14 @@ struct Data {
   //--- Input (board -> rpi)
   byte buttonVals; // 3
   byte dinVals; // 4
-  uint16_t analog[6]; // 5 - 14
-  uint16_t batteryMillivolts; // 15 - 16
+  uint16_t analog[6]; // 5 - 16
+  uint16_t batteryMillivolts; // 17 - 18
 
   //--- Output (rpi -> board)
-  byte ledVals; // 17
-  byte doutVals; // 18
-  int16_t leftMotor; // 19-20
-  int16_t rightMotor; // 21-22
+  byte ledVals; // 19
+  byte doutVals; // 20
+  int16_t leftMotor; // 21-22
+  int16_t rightMotor; // 23-24
 };
 
 PololuRPiSlave<struct Data, 5> slave;
