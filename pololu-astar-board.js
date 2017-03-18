@@ -156,8 +156,8 @@ class PololuAstarBoard extends RobotDevice {
                     }
 
                     this.d_boardState.battMV = battMV;
-                    
-                    
+
+
                 }
             }
         });
@@ -281,6 +281,9 @@ class PololuAstarBoard extends RobotDevice {
         else if (portType === Constants.PortTypes.PWM) {
             this._writePWM(channel, value);
         }
+        else if (portType === 'ASTAR-LED') {
+            this._writeLED(channel, value);
+        }
         else {
             console.warn("Attempting to write to unsupported port type");
         }
@@ -312,6 +315,30 @@ class PololuAstarBoard extends RobotDevice {
         }
 
         this._writeByte(MMAP_DOUT_VALS, newByte);
+    }
+
+    _writeLED(channel, value) {
+        var oldByte = this.d_masterBuffer[MMAP_LED_VALS];
+        var newByte;
+        var bitOffset = 0;
+        if (channel === 'RED') {
+            bitOffset = 0;
+        }
+        else if (channel === 'GREEN') {
+            bitOffset = 1;
+        }
+        else if (channel === 'YELLOW') {
+            bitOffset = 2;
+        }
+
+        if (value) {
+            newByte = oldByte | (1 << bitOffset);
+        }
+        else {
+            newByte = oldByte & ~(1 << bitOffset);
+        }
+
+        this._writeByte(MMAP_LED_VALS, newByte);
     }
 
     _writePWM(channel, value) {
