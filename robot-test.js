@@ -103,15 +103,15 @@ var robot = new Robot({
 });
 
 // Drive Forward for 5 seconds
-robot.setPWM(0, -0.5);
-robot.setPWM(1, -0.5);
+robot.writePWM(0, -0.5);
+robot.writePWM(1, -0.5);
 
 setTimeout(() => {
-	robot.setPWM(0, -0.5);
-	robot.setPWM(1, 0.5);
+	robot.writePWM(0, -0.5);
+	robot.writePWM(1, 0.5);
 
 	setTimeout(() => {
-		robot.setPWM(0, 0);
-		robot.setPWM(1, 0);
+		robot.writePWM(0, 0);
+		robot.writePWM(1, 0);
 	}, 5000);
 }, 5000);
