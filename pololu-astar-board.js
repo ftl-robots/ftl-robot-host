@@ -175,36 +175,29 @@ class PololuAstarBoard extends RobotDevice {
 
     // === External Interface
     configurePin(channel, mode) {
-        // 0/1 -> byte 0
-        // 2/3 -> byte 1
-        // 4/5 -> byte 2
-        var configByteIdx = Math.floor(channel / 2);
-        var configByte = this.d_masterBuffer[configByteIdx];
+        // Config byte layout
+        // [ configType ] [ pin ] [ mode ]
+        //      0-2        3-5       6-7
         
-        var newSetting = 0x4;
-        switch(mode) {
+        // 001 | XYZ | AB
+        var configType = 0x20;
+        var configPin = (channel << 2) & 0x1C;
+        var configMode;
+
+        switch (mode) {
             case Constants.PinModes.INPUT:
-                newSetting |= 0x1;
+                configMode = 0x1;
                 break;
             case Constants.PinModes.INPUT_PULLUP:
-                newSetting |= 0x2;
+                configMode = 0x2;
                 break;
             case Constants.PinModes.OUTPUT:
-                newSetting |= 0x0;
+                configMode = 0x0;
                 break;
         }
+        var configByte = configType | configPin | configMode;
 
-        var outByte;
-        if (channel % 2 === 0) {
-            outByte = ((newSetting << 4) & 0xF0) | (configByte & 0xF);
-        }
-        else {
-            outByte = (configByte & 0xF0) | (newSetting & 0xF);
-        }
-
-        // TODO Convert this to a single byte just for configuration?
-
-        // this._writeByte(configByteIdx, outByte);
+        this._writeByte(0x0, configByte);
     }
 
     write(portType, channel, value) {
