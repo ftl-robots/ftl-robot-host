@@ -50,6 +50,10 @@ var MMAP_OUTPUT_DIGITAL = 20; // 6 of these, bytes
 var MMAP_OUTPUT_MOTOR0 = 26;
 var MMAP_OUTPUT_MOTOR1 = 28;
 
+/**
+ * Class representing an interface to a Pololu Atmel 32u4 based robot control board 
+ * that can communicate over i2c, utilizing the protocol defined in astar-protocol.md
+ */
 class PololuAstarBoard extends RobotDevice {
     constructor(i2c, addr, id, config) {
         super(id, 'PololuAstarBoard', Constants.InterfaceTypes.I2C, config);
@@ -91,27 +95,8 @@ class PololuAstarBoard extends RobotDevice {
             ]
         };
 
-        this.d_lastReceivedBuffer;
-        this.d_masterBuffer = Buffer.alloc(25);
-        this.d_writeBuffer;
-        this.d_flushTimer;
-        this.d_inWrite = false; // Set to true when we are writing
-        this.d_inFlush = false; // Set to true when flushing onto the bus
-
-
-        this.d_lastBuf;
-        this.d_tempBuffer;
-        this.d_inWriteBuffer;
-        this.d_activeWriteBuffer; // Just a reference to which buffer to write to
-        this.d_writeTimer;
-        this.d_inWrite = false;
-
-
         // Set up polling
         this.d_i2cPolling = setInterval(this.getBoardInputValue.bind(this), 100);
-
-        this.d_lastReceivedTimestamp = 0;
-
         this.d_lastUpdate = 0;
     }
 
@@ -151,6 +136,8 @@ class PololuAstarBoard extends RobotDevice {
                     }
 
                     this.d_boardState.battMV = battMV;
+
+                    this.d_lastUpdate = timestamp;
                 }
             }
         });
