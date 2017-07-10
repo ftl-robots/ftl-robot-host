@@ -134,4 +134,7 @@ class Robot extends EventEmitter {
     }
 };
 
-module.exports = Robot;
+module.exports = {
+    Robot: Robot,
+    Constants: Constants
+};
