@@ -1,6 +1,7 @@
 module.exports = {
     InterfaceTypes: {
-        I2C: 'IFACE_I2C'
+        I2C: 'IFACE_I2C',
+        SERIAL: 'IFACE_SERIAL'
     },
     PinModes: {
         INPUT: 'PIN_MODE_INPUT',
