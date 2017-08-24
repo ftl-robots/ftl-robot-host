@@ -1,7 +1,5 @@
-'use strict';
-
-const RobotDevice = require('./device');
-const Constants = require('./constants');
+const RobotDevice = require('../ftl-device-iface');
+const Constants = require('../../constants');
 
 // Map of pin name to arduino pin number
 // This should match what is configured on the board
@@ -55,12 +53,22 @@ var MMAP_OUTPUT_MOTOR1 = 28;
  * that can communicate over i2c, utilizing the protocol defined in astar-protocol.md
  */
 class PololuAstarBoard extends RobotDevice {
-    constructor(i2c, addr, id, config) {
-        super(id, 'PololuAstarBoard', Constants.InterfaceTypes.I2C, config);
+    constructor(id, interfaceImpl, config) {
+        super(id, interfaceImpl, config);
+        this.d_type = 'PololuAstarBoard';
 
-        this.d_i2c = i2c;
-        this.d_addr = addr;
+        this.d_i2c = interfaceImpl;
+        
+        if (!config) {
+            config = {};
+        }
 
+        if (config.addr === undefined) {
+            throw new Error('No destination i2c address defined');
+        }
+        
+        this.d_addr = config.addr;
+        
         this.d_boardState = {
             buttons: {
                 buttonA: false,

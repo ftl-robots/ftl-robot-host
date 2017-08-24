@@ -1,13 +1,17 @@
 'use strict';
 
 class RobotDevice {
-    constructor(id, type, iface, config) {
+    constructor(id, interfaceImpl, config) {
         this.d_id = id;
-        this.d_type = type;
-        this.d_interface = iface;
+        this.d_interfaceImpl = interfaceImpl;
         this.d_config = config;
+        this.d_type = 'GENERIC_ROBOT_DEVICE';
     }
 
+    get deviceType() {
+        return this.d_type;
+    }
+    
     configurePin(channel, mode) {
 
     }

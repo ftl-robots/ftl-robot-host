@@ -1,21 +1,66 @@
 const EventEmitter = require('events');
 const Constants = require('./constants');
-const PololuAstarBoard = require('./pololu-astar-board');
-const I2CInterface = require('./interfaces/i2c-iface');
-const I2C = require('i2c-bus');
+const InterfaceTypes = require('./interfaces/interface-types');
+const BuiltinDeviceTypes = require('./devices/device-types');
+
+// const PololuAstarBoard = require('./devices/builtin/pololu-astar-board');
+// const I2CInterface = require('./interfaces/i2c-iface');
+// const I2C = require('i2c-bus');
 
 class Robot extends EventEmitter {
     constructor(robotConfig) {
         super();
         this.d_config = robotConfig;
+        this.d_interfaces = {};
         this.d_devices = {};
         this.d_portDeviceMaps = {};
         this.d_ready = false;
+        
+        // Assign interfaces
+        this.setupInterfaces();
 
-        // TODO Make this more generic
-        this.d_i2c = I2C.openSync(1);
-
+        // And finally set up devices
         this.setupDevices();
+    }
+
+    /**
+     * Go through the provided list of peripheral interfaces and save them
+     */
+    setupInterfaces() {
+        // This should be a list of objects with the following keys
+        // type: Constants.InterfaceTypes.*
+        // id: identifier
+        // implementation: an instance of the interface
+        var interfaceList = this.d_config.interfaces;
+        if (!interfaceList) {
+            // This is a valid use case, if, for example, this is a mock
+            // robot that doesn't have any real hardware
+            return;
+        }
+
+        for (var i = 0; i < interfaceList.length; i++) {
+            var ifaceSpec = interfaceList[i];
+            // Verify against the Interface Types that we know of
+            if (InterfaceTypes[ifaceSpec.type]) {
+                // This is a type we know about, make sure we are good
+                if (!(ifaceSpec.implementation instanceof InterfaceTypes[ifaceSpec.type])) {
+                    console.warn('Invalid implementation of type: ', ifaceSpec.type);
+                    continue;
+                }
+            }
+
+            // If we are a verified known type, or an unknown type, carry on
+            if (this.d_interfaces[ifaceSpec.id]) {
+                console.warn('Interface with id ' + ifaceSpec.id + ' already exists');
+                continue;
+            }
+
+            this.d_interfaces[ifaceSpec.id] = ifaceSpec.implementation;
+        }
+    }
+
+    getInterface(id) {
+        return this.d_interfaces[id];
     }
 
     setupDevices() {
@@ -24,13 +69,18 @@ class Robot extends EventEmitter {
         for (var i = 0; i < deviceList.length; i++) {
             var deviceSpec = deviceList[i];
 
-            // Generate built in types
-            if (deviceSpec.type === 'PololuAstarBoard') {
-                this.d_devices[deviceSpec.id] = new PololuAstarBoard(this.d_i2c, 20, deviceSpec.id, deviceSpec.configuration);
+            var deviceImpl;
+            if (BuiltinDeviceTypes[deviceSpec.type]) {
+                deviceImpl = BuiltinDeviceTypes[deviceSpec.type];
             }
             else {
-                this.d_devices[deviceSpec.id] = new deviceSpec.implementation(deviceSpec);
+                deviceImpl = deviceSpec.implementation;
             }
+
+            this.d_devices[deviceSpec.id] = 
+                        new deviceImpl(deviceSpec.id, 
+                                       this.getInterface(deviceSpec.interfaceId), 
+                                       deviceSpec.config);
         }
 
         // Map to devices
@@ -133,3 +183,5 @@ class Robot extends EventEmitter {
         }
     }
 };
+
+module.exports = Robot;

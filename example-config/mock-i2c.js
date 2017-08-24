@@ -1,9 +1,7 @@
-'use strict';
+const I2CInterface = require('../interfaces/i2c-iface');
 
-const EventEmitter = require('events');
-
-class Bus extends EventEmitter {
-    constructor(verbose) {
+class MockI2C extends I2CInterface {
+    constructor (verbose) {
         super();
         this.d_buf = Buffer.alloc(32);
         this.d_verbose = !!verbose;
@@ -86,14 +84,12 @@ class Bus extends EventEmitter {
             this.log('[mock-i2c] writeByte() called on address 0x' + (addr & 0xFFFF).toString(16) + ', cmd 0x' + (cmd & 0xFF).toString(16) + ', byte 0x' + (byte & 0xFF).toString(16));
             this.d_buf[cmd] = byte;
             cb(null);
-            this.emit('bufferModified');
         }
     }
 
     writeByteSync(addr, cmd, byte) {
         this.log('[mock-i2c] writeByteSync() called on address 0x' + (addr & 0xFFFF).toString(16) + ', cmd 0x' + (cmd & 0xFF).toString(16) + ', byte 0x' + (byte & 0xFF).toString(16));
         this.d_buf[cmd] = byte
-        this.emit('bufferModified');
     }
 
     writeWord(addr, cmd, word, cb) {
@@ -102,7 +98,6 @@ class Bus extends EventEmitter {
             this.d_buf[cmd] = (word >> 8) & 0xFF;
             this.d_buf[cmd + 1] = (word & 0xFF);
             cb(null);
-            this.emit('bufferModified');
         }
     }
 
@@ -110,7 +105,6 @@ class Bus extends EventEmitter {
         this.log('[mock-i2c] writeWordSync() called on address 0x' + (addr & 0xFFFF).toString(16) + ', cmd 0x' + (cmd & 0xFF).toString(16) + ', word 0x' + (word & 0xFFFF).toString(16));
         this.d_buf[cmd] = (word >> 8) & 0xFF;
         this.d_buf[cmd + 1] = (word & 0xFF);
-        this.emit('bufferModified');
     }
 
     writeI2cBlock(addr, cmd, length, buffer, cb) {
@@ -121,7 +115,6 @@ class Bus extends EventEmitter {
             }
 
             cb(null, length, buffer);
-            this.emit('bufferModified');
         }
     }
 
@@ -130,39 +123,7 @@ class Bus extends EventEmitter {
         for (var i = 0; i < length; i++) {
             this.d_buf[cmd + i] = buffer[i];
         }
-        this.emit('bufferModified');
     }
 }
 
-var s_busMap = {};
-
-function open(busNumber, cb) {
-    if (s_busMap[busNumber]) {
-        return s_busMap[busNumber];
-    }
-
-    if (cb) {
-        cb(null);
-    }
-
-    var bus = new Bus();
-    s_busMap[busNumber] = bus;
-
-    return bus;
-}
-
-function openSync(busNumber) {
-    if (s_busMap[busNumber]) {
-        return s_busMap[busNumber];
-    }
-
-    var bus = new Bus();
-    s_busMap[busNumber] = bus;
-
-    return bus;
-}
-
-module.exports = {
-    open: open,
-    openSync: openSync
-};
+module.exports = MockI2C;
