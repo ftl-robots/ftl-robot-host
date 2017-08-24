@@ -3,10 +3,6 @@ const Constants = require('./constants');
 const InterfaceTypes = require('./interfaces/interface-types');
 const BuiltinDeviceTypes = require('./devices/device-types');
 
-// const PololuAstarBoard = require('./devices/builtin/pololu-astar-board');
-// const I2CInterface = require('./interfaces/i2c-iface');
-// const I2C = require('i2c-bus');
-
 class Robot extends EventEmitter {
     constructor(robotConfig) {
         super();
