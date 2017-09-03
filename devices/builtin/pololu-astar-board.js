@@ -225,6 +225,20 @@ class PololuAstarBoard extends RobotDevice {
         }
     }
 
+    enable() {
+        // Unclear if we need to do this
+    }
+
+    disable() {
+        // Turn off LEDs and motors
+        this._writeLED('RED', false);
+        this._writeLED('GREEN', false);
+        this._writeLED('YELLOW', false);
+
+        this._writePWM(0, 0);
+        this._writePWM(1, 0);
+    }
+
     _writeDigital(channel, value) {
         this._writeByte(MMAP_OUTPUT_DIGITAL + channel, value ? 1 : 0);
     }

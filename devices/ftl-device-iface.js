@@ -23,6 +23,14 @@ class RobotDevice {
     read(portType, channel, value) {
 
     }
+
+    enable() {
+        
+    }
+
+    disable() {
+
+    }
 };
 
 module.exports = RobotDevice;

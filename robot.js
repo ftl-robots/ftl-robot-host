@@ -100,11 +100,18 @@ class Robot extends EventEmitter {
 
     enable() {
         this.d_enabled = true;
+        for (var deviceId in this.d_devices) {
+            var device = this.d_devices[deviceId];
+            device.enable();
+        }
     }
 
     disable() {
         this.d_enabled = false;
-        // TODO disable devices
+        for (var deviceId in this.d_devices) {
+            var device = this.d_devices[deviceId];
+            device.disable();
+        }
     }
 
     configureDigitalPinMode(channel, mode) {
@@ -141,7 +148,7 @@ class Robot extends EventEmitter {
 
     writePWM(channel, value) {
         if (!this.d_enabled) return;
-        
+
         var channelName = 'PWM-' + channel;
 
         var deviceMapInfo = this.d_portDeviceMaps[channelName];
