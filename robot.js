@@ -11,6 +11,8 @@ class Robot extends EventEmitter {
         this.d_devices = {};
         this.d_portDeviceMaps = {};
         this.d_ready = false;
+
+        this.d_enabled = false;
         
         // Assign interfaces
         this.setupInterfaces();
@@ -96,6 +98,15 @@ class Robot extends EventEmitter {
         }
     }
 
+    enable() {
+        this.d_enabled = true;
+    }
+
+    disable() {
+        this.d_enabled = false;
+        // TODO disable devices
+    }
+
     configureDigitalPinMode(channel, mode) {
         var channelName = 'D-' + channel;
         if (Constants.PinModes[mode] === undefined) {
@@ -113,6 +124,8 @@ class Robot extends EventEmitter {
     }
 
     writeDigital(channel, value) {
+        if (!this.d_enabled) return;
+
         var channelName = 'D-' + channel;
         value = !!value;
 
@@ -127,6 +140,8 @@ class Robot extends EventEmitter {
     }
 
     writePWM(channel, value) {
+        if (!this.d_enabled) return;
+        
         var channelName = 'PWM-' + channel;
 
         var deviceMapInfo = this.d_portDeviceMaps[channelName];

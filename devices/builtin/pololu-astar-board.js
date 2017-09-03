@@ -264,6 +264,7 @@ class PololuAstarBoard extends RobotDevice {
             value = -value;
         }
 
+        // TODO: Make the output value adjustable
         output = value * 400;
         if (isNegative) {
             output = -output;
