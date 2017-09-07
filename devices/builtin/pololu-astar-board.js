@@ -1,6 +1,8 @@
 const RobotDevice = require('../ftl-device-iface');
 const Constants = require('../../constants');
 
+const MOTOR_MAX_SPEED = 400;
+
 // Map of pin name to arduino pin number
 // This should match what is configured on the board
 // This is really just for reference
@@ -102,6 +104,9 @@ class PololuAstarBoard extends RobotDevice {
                 0.0 // <-- This is a fake value
             ]
         };
+
+        this.d_motorMaxSpeed = MOTOR_MAX_SPEED;
+        // TODO Update this if we are provided something in config
 
         // Set up polling
         this.d_i2cPolling = setInterval(this.getBoardInputValue.bind(this), 100);
@@ -261,34 +266,29 @@ class PololuAstarBoard extends RobotDevice {
     _writePWM(channel, value) {
         // ch 0 is left motor, ch 1 is right motor
         // send -400 to 400
-        // take in -1 to 1
-        // To follow WPILib, -ve input => +ve output 
+        // take in -255 to 255
+        if (value < -255) {
+            value = -255;
+        }
+        if (value > 255) {
+            value = 255;
+        }
+
         var isNegative = false;
         var output = 0;
-        if (value < -1) {
-            value = -1;
-        }
-        
-        if (value > 1) {
-            value = 1;
-        }
 
         if (value < 0) {
             isNegative = true;
             value = -value;
         }
 
-        // TODO: Make the output value adjustable
-        output = value * 400;
+        output = (value / 255) * this.d_motorMaxSpeed;
         if (isNegative) {
             output = -output;
         }
 
         output = Math.round(output);
-
-        //flip to follow WPILib format
-        output = -output;
-
+        
         var reg = MMAP_OUTPUT_MOTOR0;
         if (channel === 1) {
             reg = MMAP_OUTPUT_MOTOR1;
