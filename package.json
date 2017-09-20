@@ -1,6 +1,6 @@
 {
   "name": "@ftl-robots/ftl-robot-host",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A robot host for the FIRST Teaching Lab (FTL) environment",
   "main": "index.js",
   "scripts": {
