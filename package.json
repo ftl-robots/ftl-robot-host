@@ -1,5 +1,5 @@
 {
-  "name": "ftl-robot-host",
+  "name": "@ftl-robots/ftl-robot-host",
   "version": "1.0.0",
   "description": "A robot host for the FIRST Teaching Lab (FTL) environment",
   "main": "index.js",
@@ -8,14 +8,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zhiquanyeo/ftl-robot-host.git"
+    "url": "git+https://github.com/ftl-robots/ftl-robot-host.git"
   },
   "author": "ZQ Yeo",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/zhiquanyeo/ftl-robot-host/issues"
+    "url": "https://github.com/ftl-robots/ftl-robot-host/issues"
   },
-  "homepage": "https://github.com/zhiquanyeo/ftl-robot-host#readme",
+  "homepage": "https://github.com/ftl-robots/ftl-robot-host#readme",
   "devDependencies": {},
   "dependencies": {
     "winston": "^2.3.1"
