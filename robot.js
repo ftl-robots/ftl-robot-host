@@ -41,10 +41,13 @@ class Robot extends EventEmitter {
             // Verify against the Interface Types that we know of
             if (InterfaceTypes[ifaceSpec.type]) {
                 // This is a type we know about, make sure we are good
-                if (!(ifaceSpec.implementation instanceof InterfaceTypes[ifaceSpec.type])) {
-                    console.warn('Invalid implementation of type: ', ifaceSpec.type);
-                    continue;
-                }
+
+                // Skip the type check.
+                // TODO Implement something with a signature instead of depending on instanceof
+                // if (!(ifaceSpec.implementation instanceof InterfaceTypes[ifaceSpec.type])) {
+                //     console.warn('Invalid implementation of type: ', ifaceSpec.type);
+                //     continue;
+                // }
             }
 
             // If we are a verified known type, or an unknown type, carry on
