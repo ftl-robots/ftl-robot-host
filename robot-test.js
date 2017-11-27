@@ -8,6 +8,8 @@ var ExampleConfig = require('./example-config/example-config');
 
 var robot = new Robot(ExampleConfig);
 
+console.log('ports: ', robot.getPortList());
+
 // Drive Forward for 5 seconds
 robot.writePWM(0, -0.5);
 robot.writePWM(1, -0.5);

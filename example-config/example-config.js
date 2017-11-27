@@ -23,17 +23,20 @@ var config = {
         'D-0': {
             deviceId: 'main-board',
             devicePortType: 'ASTAR-LED',
-            devicePort: 'RED'
+            devicePort: 'RED',
+            direction: Constants.PortDirections.OUTPUT_ONLY
         },
         'D-1': {
             deviceId: 'main-board',
             devicePortType: 'ASTAR-LED',
-            devicePort: 'YELLOW'
+            devicePort: 'YELLOW',
+            direction: Constants.PortDirections.OUTPUT_ONLY
         },
         'D-2': {
             deviceId: 'main-board',
             devicePortType: 'ASTAR-LED',
-            devicePort: 'GREEN'
+            devicePort: 'GREEN',
+            direction: Constants.PortDirections.OUTPUT_ONLY
         },
         'D-3': {
             deviceId: 'main-board',
@@ -54,17 +57,20 @@ var config = {
         'D-6': {
             deviceId: 'main-board',
             devicePortType: 'ASTAR-BUTTON',
-            devicePort: 'A'
+            devicePort: 'A',
+            direction: Constants.PortDirections.INPUT_ONLY
         },
         'D-7': {
             deviceId: 'main-board',
             devicePortType: 'ASTAR-BUTTON',
-            devicePort: 'B'
+            devicePort: 'B',
+            firection: Constants.PortDirections.INPUT_ONLY
         },
         'D-8': {
             deviceId: 'main-board',
             devicePortType: 'ASTAR-BUTTON',
-            devicePort: 'C'
+            devicePort: 'C',
+            direction: Constants.PortDirections.INPUT_ONLY
         },
         'A-0': {
             deviceId: 'main-board',

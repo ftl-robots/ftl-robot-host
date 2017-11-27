@@ -96,7 +96,8 @@ class Robot extends EventEmitter {
             this.d_portDeviceMaps[portName] = {
                 device: this.d_devices[mapInfo.deviceId],
                 devicePortType: mapInfo.devicePortType,
-                devicePort: mapInfo.devicePort
+                devicePort: mapInfo.devicePort,
+                direction: mapInfo.direction
             }
         }
     }
@@ -125,6 +126,11 @@ class Robot extends EventEmitter {
 
         var deviceMapInfo = this.d_portDeviceMaps[channelName];
         if (deviceMapInfo) {
+            // If a direction was specified in config, that pin is non configurable
+            if (deviceMapInfo.direction) {
+                throw new Error('Attempting to configure a non-configurable pin ' + channelName);
+            }
+
             var device = deviceMapInfo.device;
             device.configurePin(deviceMapInfo.devicePort, mode);
         }
@@ -202,6 +208,57 @@ class Robot extends EventEmitter {
         else {
             throw new Error('Attempting to read from unmapped port ' + channelName);
         }
+    }
+
+    /**
+     * Returns an object with 3 keys (digital, analog, pwm), and each value
+     * is an array of port descriptors, with port number and direction 
+     * (input, output, both)
+     */
+    getPortList() {
+        var portList = {
+            digital: [],
+            analog: [],
+            pwm: []
+        };
+
+        // Loop through the port map. All ports are keyed by type-num
+        var portMap = this.d_portDeviceMaps;
+        for (var portName in portMap) {
+            var portNameSplit = portName.split('-');
+            if (portNameSplit.length < 2) {
+                continue;
+            }
+
+            var pType = portNameSplit[0];
+            var pChannel = parseInt(portNameSplit[1], 10);
+            var pData = portMap[portName];
+
+            if (isNaN(pChannel)) {
+                continue;
+            }
+
+            switch (pType) {
+                case 'D': {
+                    portList.digital.push({
+                        channel: pChannel,
+                        direction: pData.direction || Constants.PortDirections.BOTH
+                    });
+                } break;
+                case 'A': {
+                    portList.analog.push({
+                        channel: pChannel
+                    });
+                } break;
+                case 'PWM': {
+                    portList.pwm.push({
+                        channel: pChannel
+                    });
+                }
+            }
+        }
+
+        return portList;
     }
 };
 

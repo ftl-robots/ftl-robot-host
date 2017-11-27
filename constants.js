@@ -12,5 +12,10 @@ module.exports = {
         DIGITAL: 'DIGITAL',
         ANALOG: 'ANALOG',
         PWM: 'PWM'
+    },
+    PortDirections: {
+        INPUT_ONLY: 'INPUT_ONLY',
+        OUTPUT_ONLY: 'OUTPUT_ONLY',
+        BOTH: 'BOTH'
     }
 };
